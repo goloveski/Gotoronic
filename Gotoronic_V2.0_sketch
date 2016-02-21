@@ -1,48 +1,41 @@
 // Fメカ操作時にリヤが動くのを修正
-// 150809シフトポジション・シフト量調整
-// Sweep
-// by BARRAGAN <http://barraganstudio.com> 
-// This example code is in the public domain.
-// Sample code from Arduino´s IDE
+// 160222各ギヤごとの微調整用オフセットデータを持たせる。-> pos_data[10] 
+// 160222 save gear position to EEPROM
+// 160222 added single LINE 2 signal SW system
 
 // SERVO REAR
-// Red = +5v
+// Red = +6v
 // Brown = GND
 // Orange = Signal (pin 9 for this code)
 
 // SERVO FRONT
-// Red = +5v
+// Red = +6v
 // Brown = GND
 // Orange = Signal (pin 8 for this code)
 
+// single LINE 2 signal SW system
+// shift UP   SIGNAL(PIN4)SW--35Kohm--GND about 1/2 VDD
+// shift DOWN SIGNAL(PIN4)SW-- 0ohm --GND 
+// PIN4 
+// tune adc_val, ana_read_dly, for sensitivity
 
-// 0.1 by pmalmsten http://www.arduino.cc/cgi-bin/yabb2/YaBB.pl?num=1176098434
-// 0.2 by farkinga
-// 0.3 by farkinga - adds cool behaviors
-/* 0.4 by pstrobl
-   changed the original program to use on IR Kit For Arduino Model: DFR0107 32 bit controller.
-   All keypresses are sent to the serial monitor at 9600 baud.
-   pulseIn is always HIGH. The phototransistor in the kit does not invert the signal.
-   uses pin 13 for heartbeat debug
-   32 bits requires a long variable, so divided up into two 15 bit so can use integer variables
-   use the first 15 bits of the 32 bits for remote and data stream verification. This code is always the same for every button press
-   use the last 15 of the 32 bits for button press selection. This code changes for each button.
-   ignore the middle 2 bits, it never changes. 
-*/
 
+#include <EEPROM.h>
 #include <Servo.h> 
 #include <Bounce2.h>
 #include <MsTimer2.h> 
+
 
 #define BUTTON_PIN 4  //REAR 
 #define BUTTON_PIN2 5 //REAR
 #define BUTTON_PIN_f1 6  //FRONT
 #define BUTTON_PIN_f2 7  //FRONT
 #define LED_PIN2 10
+#define LED_PIN 13          // LED goes off when signal is received
 
 // Instantiate a Bounce object
-Bounce debouncer = Bounce(); 
-Bounce debouncer2 = Bounce(); 
+//Bounce debouncer = Bounce(); 
+//Bounce debouncer2 = Bounce(); 
 Bounce debouncer3 = Bounce(); 
 Bounce debouncer4 = Bounce();
 
@@ -74,26 +67,31 @@ char input[2];  //シリアル通信の文字列格納用
 char str[0];    //シリアル通信の文字列格納用
 int pos = 0;    // variable to store the servo position
 int pos_f = 0;  // variable to store the servo position 
- 
-#define IR_BIT_LENGTH 32    // number of bits sent by IR remote
-#define FirstLastBit 15     // divide 32 bits into two 15 bit chunks for integer variables. Ignore center two bits. they are all the same.
-#define BIT_1 1500          // Binary 1 threshold (Microseconds) 1500
-#define BIT_0 450           // Binary 0 threshold (Microseconds) 450
-#define BIT_START 4000      // Start bit threshold (Microseconds)
- 
-#define IR_PIN 13           // IR Sensor pin
-#define LED_PIN 13          // LED goes off when signal is received
- 
-int debug = 0;              // flag as 1 to output raw IR pulse data stream length in microseconds
-int output_verify = 0;      // flag as 1 to print decoded verification integers. same number for all buttons
-int output_key = 1;         // flag as 1 to print decoded key integers
-int remote_verify = 16128;  // verifies first bits are 11111100000000 different remotes may have different start codes
+int analogvalue1; //ボタン１のアナログ値
+int analogvalue2; //ボタン１のアナログ値
+int adc_val[2] ={400, 700}; //AD閾値
+char adc_val_position[3][5] = {"LOW", "MID","HIGH"};//AD閾値
+int NUM_ADC_DIV = 2;//AD閾値
+int SWstatus = 0;//ADステータス
+int SWstatus_new = 0;//ADステータス
+int SWstatus_old = 0;//ADステータス
+int SW_short_status_new = 0;//ADステータス
+int SW_short_status_old = 0;//ADステータス
+int ana_read_dly = 10; //delay anarog read[ms]
+
+//////////////////////////////// EEPROM PARAMETER START ///////////////////////////////////////////
+int pos_final_addres = 10; //final gear position save address
+int pos_final; //final gear position
+int pos_final_addres_f = 1; //final gear position save address front
+int pos_final_f; //final gear position front
 
 
 //////////////////////////////// REAR SHIFT SETTING PARAMETER START ///////////////////////////////////////////
 
 int pos_zero = 2180;          // shift 0 position 180deg ->1st gear direction, 0deg ->10th gear direction, 
 int pos_shiftstep = 56;      // shift step degree 68->56 @150809
+int pos_data[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // 10speed tuninng data
+
 int pos_shiftover_up = 40;   // shift over degree
 int pos_shiftover_down = 40; // shift over degree
 int ovsft_delay = 500;      // over shift delay [msec]
@@ -101,8 +99,8 @@ int sft_delay = 20;         // shift delay per gear pos [msec]
 
 //////////////////////////////// REAR SHIFT SETTING PARAMETER END ///////////////////////////////////////////
 
-int pos_old  = 0;           // gear position
-int pos_new  = 0;           // gear position
+int pos_old;           // gear position
+int pos_new;           // gear position
 int pos_direction  = 1;     // shift direction
 int ovsft_delay_tot = 100;    // over shift delay msec
 
@@ -125,18 +123,18 @@ int pos_new_f  = 0;           // gear position
 int pos_direction_f  = 1;     // shift direction
 int ovsft_delay_tot_f = 100;    // over shift delay msec
 
-
  
 void setup() 
 { 
+ 
+  pos_final = EEPROM.read(pos_final_addres);
+  pos_new = pos_final;
+  pos = pos_zero - pos_shiftstep * pos_final + pos_data[pos_final];
+  delay(2);
   myservo.attach(9);        // attaches the servo on pin 9 to the servo object 
   myservo_f.attach(8);      // attaches the servo on pin 8 to the servo object 
-  pinMode(LED_PIN, OUTPUT); //This shows when ready to recieve
-  pinMode(IR_PIN, INPUT);
-  digitalWrite(LED_PIN, LOW);
-  pos = pos_zero;         //set zero position
   myservo.writeMicroseconds(pos);                // tell servo to go to position in variable 'pos'
-  delay(200);                         // waits 15ms for the servo to reach the position 15
+  delay(10);                         // waits 15ms for the servo to reach the position 15
   pos_f = pos_zero_f;         //set zero position
   myservo_f.write(pos_f);                // tell servo to go to position in variable 'pos'
   delay(200);                         // waits 15ms for the servo to reach the position 15
@@ -149,23 +147,17 @@ void setup()
    //  MsTimer2::start();
    
   // Setup the button
-  pinMode(BUTTON_PIN,INPUT);
-  pinMode(BUTTON_PIN2,INPUT);
+  pinMode(BUTTON_PIN,INPUT_PULLUP);
+  pinMode(BUTTON_PIN2,INPUT_PULLUP);
   pinMode(BUTTON_PIN_f1,INPUT);
   pinMode(BUTTON_PIN_f2,INPUT);
   // Activate internal pull-up
-  digitalWrite(BUTTON_PIN,HIGH);
-  digitalWrite(BUTTON_PIN2,HIGH);
   digitalWrite(BUTTON_PIN_f1,HIGH);
   digitalWrite(BUTTON_PIN_f2,HIGH);
   
   // After setting up the button, setup debouncer
-  debouncer.attach(BUTTON_PIN);
-  debouncer2.attach(BUTTON_PIN2);
   debouncer3.attach(BUTTON_PIN_f1);
   debouncer4.attach(BUTTON_PIN_f2);
-  debouncer.interval(2);
-  debouncer2.interval(2);
   debouncer3.interval(2);
   debouncer4.interval(2);
   //Setup the LED
@@ -178,7 +170,9 @@ void setup()
    
 } 
  
-void loop() { 
+void loop() {  
+  delay(5);
+
   if (Serial.available() > 0) {     // get incoming byte:
   serialin();                        //下記のvoid serialinの内容を実行
   Serial.println(pos);              // send a capital ASerial.println('pos');   // send a capital pos
@@ -188,68 +182,79 @@ void loop() {
   Serial.println(myservo.read());
   Serial.println(myservo_f.read());
   }
-//  
-//  digitalWrite(LED_PIN, HIGH);
-////  int key = get_ir_key();
-//   
-//  digitalWrite(LED_PIN, LOW);  // turn LED off while processing response
-////  do_response(key);
-//  delay(260);                  // 2 cycle delay to cancel duplicate keypresses 130
-///*
-//  wait for a keypress from the IR remote, and return the
-//  integer mapping of that key (e.g. power button on remote returns
-//  the integer 1429)
-//*/
-//
+
+//   Serial.print("START POSITION = ");
+//   Serial.println(pos_final);
 
  // Update the debouncer and get the changed state
-  boolean changed = debouncer.update();
-  boolean changed2 = debouncer2.update();
   boolean changed_f1 = debouncer3.update();
   boolean changed_f2 = debouncer4.update();
-  
-  if ( changed ) {
-       // Get the update value
-    int value = debouncer.read();
-    if ( value == HIGH) {
-       digitalWrite(LED_PIN2, HIGH );
-       buttonState = 0;
-       Serial.println("Button released (state 0)");
-       pos_ctrl_end();
-   }
-   else  {
-         digitalWrite(LED_PIN2, LOW );
-         buttonState = 1;
-         Serial.println("Button pressed (state 1)");
-         buttonPressTimeStamp = millis();
-         pos_old = pos_new;
-         if( pos_new < 9 ) {pos_new ++;}
-         pos_ctrl();
+
+
+ 
+ //Read Analog SW   
+   int n;
+   for (n = 0; n < 10; n++){
+      if (SW_short_status_old != SW_short_status_new){
+          SW_short_status_old = SW_short_status_new;
+          delay(10); 
+          break;
+          }
+          
+       ReadAna1() ;
+       int k;
+       for (k = 0; k < NUM_ADC_DIV; k++){
+            if (analogvalue1 < adc_val[k]){
+               break;
+               }   
+       }
+       SW_short_status_new = k;
+       k = 0;
      }
-  }
+   SWstatus_new = SW_short_status_new; 
+//   Serial.print("ANALOG SW POSITION = ");
+//   Serial.println( adc_val_position[SWstatus_new]);
+   delay(10); 
 
-  if ( changed2 ) {
-       // Get the update value
-    int value2 = debouncer2.read();
-    if ( value2 == HIGH) {
-       digitalWrite(LED_PIN2, HIGH );
-       buttonState2 = 0;
-       Serial.println("Button2 released (state 0)");
-       pos_ctrl_end();
+if (SWstatus_old != SWstatus_new){
+      SWstatus_old = SWstatus_new;
+
+        switch(SWstatus_new){
+            case 0:   
+               digitalWrite(LED_PIN2, LOW );
+               buttonState2 = 1;
+               buttonState = 0;
+               Serial.println("Button pressed (state LOW)");
+               buttonPressTimeStamp2 = millis();
+               pos_old = pos_new;
+               if( pos_new > 0 ) {pos_new --;}
+               pos_ctrl();
+               break;
+
+            case 1:
+               digitalWrite(LED_PIN2, LOW );
+               buttonState = 1;
+               buttonState2 = 0;
+               Serial.println("Button pressed (state MID)");
+               buttonPressTimeStamp = millis();
+               pos_old = pos_new;
+               if( pos_new < 9 ) {pos_new ++;}
+               pos_ctrl();
+               break;  
+    
+            case 2:
+               // Get the update value
+               digitalWrite(LED_PIN2, HIGH );
+               buttonState = 0;
+               buttonState2 = 0;
+               Serial.println("Button released (state HIGH)");
+               pos_ctrl_end();
+               break;    
+        } 
    }
-   else {
-         digitalWrite(LED_PIN2, LOW );
-         buttonState2 = 1;
-         Serial.println("Button2 pressed (state 1)");
-         buttonPressTimeStamp2 = millis();
-         pos_old = pos_new;
-         if( pos_new >0 ) {pos_new --;}
-         pos_ctrl();
-        }
-  }
-
-
-  
+   
+ /* 多段変速用*/
+ 
   if  ( buttonState == 1 ) {
     if ( millis() - buttonPressTimeStamp >= 500 ) {
         buttonState = 2;
@@ -269,8 +274,8 @@ void loop() {
         }
   } 
    if  ( buttonState == 3 ) {
-    if ( millis() - buttonPressTimeStamp >= 1500 ) {
-        buttonState = 4;
+    if ( millis() - buttonPressTimeStamp >= 150 ) {
+        buttonState = 0;
        Serial.println("Button held for 1.5 seconds (state 4)");
        pos_old = pos_new;
        if( pos_new < 9 ) {pos_new ++;}
@@ -298,7 +303,7 @@ void loop() {
   } 
   if  ( buttonState2 == 3 ) {
     if ( millis() - buttonPressTimeStamp2 >= 1500 ) {
-        buttonState2 = 4;
+        buttonState2 = 0;
        Serial.println("Button2 held for 1.5 seconds (state 4)");
        pos_old = pos_new;
        if( pos_new  >0 ) { pos_new --;}
@@ -393,14 +398,23 @@ void serialin() {
 //      Serial.flush();  
  }
 
+///////////////READ ANALOG///////////////////
+void ReadAna1() {
+    analogvalue1 = analogRead(A6);
+//      Serial.print("analogvalue1 = ");
+//      Serial.println(analogvalue1);
+    delay(ana_read_dly);  //wait ana_read_dly msec
+    }
+
 ///////////////POSITION CTRL///////////////////
 void pos_ctrl() 
 {
         pos_direction = pos_new - pos_old;
         ovsft_delay_tot = abs(pos_direction) * sft_delay + ovsft_delay;
-        Serial.println(ovsft_delay_tot);
+//        Serial.println(ovsft_delay_tot);
         if( pos_direction > 0 ) {                                         // up stroke
-           pos = pos_zero - pos_shiftstep * pos_new - pos_shiftover_up;   // shift over degree
+           pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new] - pos_shiftover_up;   // shift over degree
+           Serial.print("servo position = ");
            Serial.println(pos);
 //delay(130);
            myservo.writeMicroseconds(pos); 
@@ -409,7 +423,8 @@ void pos_ctrl()
 //           myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos'
         }
        if( pos_direction < 0 ) {                                           // down stroke 
-           pos = pos_zero - pos_shiftstep * pos_new + pos_shiftover_down;  // shift over degree
+           pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new] + pos_shiftover_down;  // shift over degree
+           Serial.print("servo position = ");
            Serial.println(pos);
 // delay(130);
            myservo.writeMicroseconds(pos); 
@@ -421,23 +436,35 @@ void pos_ctrl()
 //       Serial.println(myservo.read());
 //       delay(15);                                                          // waits 15ms for the servo to reach the position 
    if( pos_new == 9 ) {                                         // 9position
-           pos = pos_zero - pos_shiftstep * pos_new - pos_shiftover_up;   // shift over degree
+           pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new] - pos_shiftover_up;   // shift over degree
            myservo.writeMicroseconds(pos); 
    }
    if( pos_new == 0 ) {                                         // 9position
-            pos = pos_zero - pos_shiftstep * pos_new + pos_shiftover_down;    // shift over degree
-            myservo.writeMicroseconds(pos); 
+           pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new] + pos_shiftover_down;    // shift over degree
+           myservo.writeMicroseconds(pos); 
    }
 
 
 }
 
 void pos_ctrl_end() {
-           pos = pos_zero - pos_shiftstep * pos_new;                       // shift over degree
-           myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos'      
-           Serial.println(myservo.read());
+           pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new];                       // shift over degree        
+           myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos' 
+           pos_final = EEPROM.read(pos_final_addres);
+ //          delay(1000);
+           Serial.print("EEPROM OLD = ");
+           Serial.println(pos_final);
+           pos_final = pos_new;
+           EEPROM.write(pos_final_addres, pos_final);
+           delay(5);
+           Serial.print("servo position = ");
+           Serial.println(pos);
+           //Serial.println(myservo.read());
            Serial.print("gear position = ");
            Serial.println(pos_new);
+           pos_final = EEPROM.read(pos_final_addres);
+           Serial.print("EEPROM NEW = ");
+           Serial.println(pos_final);
            
 }
 
@@ -458,7 +485,6 @@ void pos_ctrl_f()
         ovsft_delay_tot_f = abs(pos_direction_f) * sft_delay_f + ovsft_delay_f;
         Serial.println(ovsft_delay_tot_f);
         if( pos_direction_f > 0 ) {                                         // up stroke
-           //pos_f = pos_zero_f - pos_shiftstep_f * pos_new_f - pos_shiftover_up_f;   // shift over degree
            pos_f = pos_inner - pos_shiftover_up_f;   // shift over degree 
            Serial.println(pos_f);
 // delay(130);
@@ -466,7 +492,6 @@ void pos_ctrl_f()
            //delay(ovsft_delay_tot_f);                                         // waits Xmsec for the servo to reach the position 
            if( RotEncState = HIGH){
            RotEncState = LOW;  
-           //pos_f = pos_zero_f - pos_shiftstep_f * pos_new_f;                       // shift over degree
            pos_f = pos_inner;                       // shift over degree
            MsTimer2::set(ovsft_delay_tot_f,servo_move); // 500msごとにオンオフ
            MsTimer2::start();
@@ -474,7 +499,6 @@ void pos_ctrl_f()
            }
         }
        if( pos_direction_f < 0 ) {                                           // down stroke 
-           //pos_f = pos_zero_f - pos_shiftstep_f * pos_new_f + pos_shiftover_down_f;  // shift over degree
            pos_f = pos_outer + pos_shiftover_down_f;  // shift over degree
            Serial.println(pos_f);
 // delay(130);
@@ -482,7 +506,6 @@ void pos_ctrl_f()
            //delay(ovsft_delay_tot_f);            // waits Xmsec for the servo to reach the position 
           if( RotEncState = HIGH){
            RotEncState = LOW;  
-           //pos_f = pos_zero_f - pos_shiftstep_f * pos_new_f;                       // shift over degree
            pos_f = pos_outer;                       // shift over degree
            MsTimer2::set(ovsft_delay_tot_f,servo_move); // 500msごとにオンオフ
            MsTimer2::start();
@@ -491,7 +514,7 @@ void pos_ctrl_f()
         }
        Serial.println(pos_f);
 
-       delay(15);                                                          // waits 15ms for the servo to reach the position 
+       delay(1);                                                          // waits 15ms for the servo to reach the position 
 }
 
 //void pos_ctrl_end_f() {
@@ -534,291 +557,6 @@ void Change_B() {  //デジタルピン3の電圧が変化した時
         }
 
 }
-
-
-///////////////IR CTRL///////////////////
-int get_ir_key()
-{
-  int pulse[IR_BIT_LENGTH];
-  int bits[IR_BIT_LENGTH];
- 
-  do { //Wait for a start bit
-//     if (Serial.available() > 0) {
-//      break;
-//     }
-  }
-  while(pulseIn(IR_PIN, HIGH) < BIT_START);
-  read_pulse(pulse);
-  pulse_to_bits(pulse, bits);
-  RemoteVerify(bits);
-  return bits_to_int(bits);
- 
-}
- 
- 
-/*
-  use pulseIn to receive IR pulses from the remote.
-  Record the length of these pulses (in ms) in an array
-*/
- 
-void read_pulse(int pulse[])
-{
-  for (int i = 0; i < IR_BIT_LENGTH; i++)
-  {
-    pulse[i] = pulseIn(IR_PIN, HIGH);
-  }
-}
- 
-/*
-  IR pulses encode binary "0" as a short pulse, and binary "1"
-  as a long pulse.  Given an array containing pulse lengths,
-  convert this to an array containing binary values
-*/
- 
-void pulse_to_bits(int pulse[], int bits[])
-{
-  if (debug) { Serial.println("-----"); }
-  for(int i = 0; i < IR_BIT_LENGTH; i++)
-  {
-    if (debug) { Serial.println(pulse[i]); }
-    if(pulse[i] > BIT_1) //is it a 1?
-    {
-      bits[i] = 1;
-    } 
-    else if(pulse[i] > BIT_0) //is it a 0?
-    {
-      bits[i] = 0;
-    }
-    else //data is invalid...
-    {
-      Serial.println("Error");
-    }
-  }
-}
- 
-/*
-  check returns proper first 14 check bits
-*/
- 
-void RemoteVerify(int bits[])
-{
-  int result = 0;
-  int seed = 1;
-   
-  //Convert bits to integer
-  for(int i = 0 ; i < (FirstLastBit) ; i++)
-  {      
-    if(bits[i] == 1)
-    {
-    result += seed;
-    }
-     
-    seed *= 2;
-  }
-        if (output_verify)
-      {
-        Serial.print("Remote ");
-        Serial.print(result);
-        Serial.println(" verification code");
-      }
- if (remote_verify != result) {delay (60); get_ir_key();} //verify first group of bits. delay for data stream to end, then try again.
-}
- 
- 
-/*
-  convert an array of binary values to a single base-10 integer
-*/
- 
-int bits_to_int(int bits[])
-{
-  int result = 0;
-  int seed = 1;
-   
-  //Convert bits to integer
-  for(int i = (IR_BIT_LENGTH-FirstLastBit) ; i < IR_BIT_LENGTH ; i++)
-  {      
-    if(bits[i] == 1)
-    {
-    result += seed;
-    }  
-    seed *= 2;
-  }
-  return result;
-}
- 
- 
-/*
-  respond to specific remote-control keys with different behaviors
-*/
- 
-void do_response(int key)
-{ 
-   
-  if (output_key)
-   {
-      Serial.print("Key ");
-      Serial.println(key);
-   }
-   
-  switch (key)
-  {
-    case 32640:  // turns on UUT power
-      Serial.println("POWER");
-      pos_old_f = pos_new_f;
-      pos_new_f = 0;
-      pos_ctrl_f();
-      break;
- 
-    case 32385:  // FUNC/STOP turns off UUT power
-      Serial.println("FUNC/STOP");
-      pos_old_f = pos_new_f;
-      pos_new_f = pos_outer;
-      pos_ctrl_f();
-      break;
- 
-    case 32130:  // |<< ReTest failed Test
-      Serial.println("|<<");
-      pos_f=pos_f+10;
-      Serial.println(pos_f);   // send a capital ASerial.println('pos');   // send a capital pos
-      myservo_f.write(pos_f);              // tell servo to go to position in variable 'pos'
-      Serial.println(myservo_f.read());
-      delay(200);                       // waits 15ms for the servo to reach the position 
-      break;
- 
-    case 32002:  // >|| Test
-      Serial.println(">||");
-      break;
- 
-    case 31875:  // >>| perform selected test number
-      Serial.println(">>|");
-      pos_f=pos_f-10;
-      Serial.println(pos_f);   // send a capital ASerial.println('pos');   // send a capital pos
-      myservo_f.write(pos_f);              // tell servo to go to position in variable 'pos'
-      Serial.println(myservo_f.read());
-      delay(200);                       // waits 15ms for the servo to reach the position 
-      break;
- 
-    case 32512:  // VOL+ turns on individual test beeper
-      Serial.println("VOL+");
-      break;
- 
-    case 31492:  // VOL- turns off individual test beeper
-      Serial.println("VOL-");
-      break;
- 
-    case 31620:  // v scroll down tests
-      Serial.println("v");
-      pos=pos+10;
-      Serial.println(pos);   // send a capital ASerial.println('pos');   // send a capital pos
-      myservo.writeMicroseconds(pos);              // tell servo to go to position in variable 'pos'
-      Serial.println(myservo.read());
-      delay(200);                       // waits 15ms for the servo to reach the position 
-      break;
- 
-    case 31365:  // ^ scroll up tests
-      Serial.println("^");
-      pos=pos-10;
-      Serial.println(pos);   // send a capital ASerial.println('pos');   // send a capital pos
-      myservo.writeMicroseconds(pos);              // tell servo to go to position in variable 'pos'
-      Serial.println(myservo.read());
-      delay(200);                       // waits 15ms for the servo to reach the position 
-      break;
- 
-    case 30982:  // EQ negative tests internal setup
-      Serial.println("EQ");
-      pos_old = pos_new;
-      pos_new = 0;
-      pos_ctrl();
-      break;
- 
-    case 30855:  // ST/REPT Positive tests Select Test and Repeat Test
-    Serial.println("ST/REPT");
-      pos_old = pos_new;
-      pos_new = 0;
-      pos_ctrl();
-      break;
- 
-    case 31110:  // 0
-      Serial.println("0");
-      pos_old = pos_new;
-      pos_new = 0;
-      pos_ctrl();
-      break;
- 
-    case 30600:  // 1
-      Serial.println("1");
-      pos_old = pos_new;
-      pos_new = 1;
-      pos_ctrl();
-      break;
- 
-    case 30472:  // 2
-      Serial.println("2");
-      pos_old = pos_new;
-      pos_new = 2;
-      pos_ctrl();
-      break;
- 
-    case 30345:  // 3
-      Serial.println("3");
-      pos_old = pos_new;
-      pos_new = 3;
-      pos_ctrl();
-      break;
- 
-    case 30090:  // 4
-      Serial.println("4");
-      pos_old = pos_new;
-      pos_new = 4;
-      pos_ctrl();
-      break;
- 
-    case 29962:  // 5
-      Serial.println("5");
-      pos_old = pos_new;
-      pos_new = 5;
-      pos_ctrl();
-      break;
- 
-    case 29835:  // 6
-      Serial.println("6");
-      pos_old = pos_new;
-      pos_new = 6;
-      pos_ctrl();
-      break;
- 
-    case 29580:  // 7
-      Serial.println("7");
-      pos_old = pos_new;
-      pos_new = 7;
-      pos_ctrl();
-      break;
- 
-    case 29452:  // 8
-      Serial.println("8");
-      pos_old = pos_new;
-      pos_new = 8;
-      pos_ctrl();
-      break;
- 
-    case 29325:  // 9
-      Serial.println("9");
-      pos_old = pos_new;
-      pos_new = 9;
-      pos_ctrl();
-      break;
-      
-    default:
-      {
-        Serial.print("Key ");
-        Serial.print(key);
-        Serial.println(" not programmed");
-      }
-    break;
-  }
-}
-
-
 
 
 
