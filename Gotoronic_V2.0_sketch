@@ -128,8 +128,10 @@ void setup()
 { 
  
   pos_final = EEPROM.read(pos_final_addres);
+  if (pos_final <  0){ pos_final = 0;} //ギヤポジション0より小を禁止
+  if (pos_final > 10){ pos_final = 0;} //ギヤポジション10より大を禁止
   pos_new = pos_final;
-  pos = pos_zero - pos_shiftstep * pos_final + pos_data[pos_final];
+  pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new];
   delay(2);
   myservo.attach(9);        // attaches the servo on pin 9 to the servo object 
   myservo_f.attach(8);      // attaches the servo on pin 8 to the servo object 
@@ -452,8 +454,8 @@ void pos_ctrl_end() {
            myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos' 
            pos_final = EEPROM.read(pos_final_addres);
  //          delay(1000);
-           Serial.print("EEPROM OLD = ");
-           Serial.println(pos_final);
+          // Serial.print("EEPROM OLD = ");
+          // Serial.println(pos_final);
            pos_final = pos_new;
            EEPROM.write(pos_final_addres, pos_final);
            delay(5);
