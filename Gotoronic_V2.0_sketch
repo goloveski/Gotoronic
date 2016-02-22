@@ -1,7 +1,8 @@
 // Fメカ操作時にリヤが動くのを修正
 // 160222各ギヤごとの微調整用オフセットデータを持たせる。-> pos_data[10] 
 // 160222 save gear position to EEPROM
-// 160222 added single LINE 2 signal SW system
+// 160222 added single LINE 2 signal SW 
+// 160222 added EEPROM status limit
 
 // SERVO REAR
 // Red = +6v
