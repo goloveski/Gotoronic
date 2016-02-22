@@ -130,7 +130,7 @@ void setup()
  
   pos_final = EEPROM.read(pos_final_addres);
   if (pos_final <  0){ pos_final = 0;} //ギヤポジション0より小を禁止
-  if (pos_final > 10){ pos_final = 0;} //ギヤポジション10より大を禁止
+  if (pos_final >  9){ pos_final = 0;} //ギヤポジション9より大を禁止
   pos_new = pos_final;
   pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new];
   delay(2);
