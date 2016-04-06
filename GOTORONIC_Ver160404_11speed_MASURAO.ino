@@ -1,3 +1,7 @@
+//Copyright (c) 2016 goloveski
+//Released under the MIT license
+//http://opensource.org/licenses/mit-license.php
+//
 // 160211各ギヤごとにデータを持たせる。-> pos_data[10]
 // 160222 save gear position to EEPROM
 // 160308 delete// 160222 added single LINE 2 signal SW system
