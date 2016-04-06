@@ -28,8 +28,8 @@
 #include <MsTimer2.h> 
 
 //////////////////////////////// MCU PIN ASSIGN START ///////////////////////////////////////////
-#define BUTTON_PIN 2  //REAR MASURAO SPECIAL
-#define BUTTON_PIN2 3 //REAR MASURAO SPECIAL
+#define BUTTON_PIN 4 //REAR
+#define BUTTON_PIN2 5 //REAR
 #define BUTTON_PIN_f1 6  //FRONT
 #define BUTTON_PIN_f2 7  //FRONT
 #define SERVO_PIN_F 8  // SERVO F
