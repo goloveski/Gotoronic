@@ -1,3 +1,7 @@
+//Copyright (c) 2016 goloveski
+//Released under the MIT license
+//http://opensource.org/licenses/mit-license.php
+//
 // Fメカ操作時にリヤが動くのを修正
 // 160222各ギヤごとの微調整用オフセットデータを持たせる。-> pos_data[10] 
 // 160222 save gear position to EEPROM
