@@ -105,7 +105,7 @@ int pos_memory_addres = 11; //offsetmemory start addres 11 12 13 14 15 16 17 18 
 
 //////////////////////////////// REAR SHIFT SETTING PARAMETER START ///////////////////////////////////////////
 
-int speed_step = 9;						//8=9速 9=10速 10=11速
+int speed_step = 8;						//8=9速 9=10速 10=11速
 int pos_zero0 = 1925;					// shift 0 position 180deg ->1st gear direction, 0deg ->10th gear direction, 
 int pos_zero = 1925;					 // shift 0 position 180deg ->1st gear direction, 0deg ->10th gear direction, 
 int pos_shiftstep = 68;				// shift step degree 56->68 @160404 for 9speed
@@ -154,11 +154,13 @@ void setup()
 	pos_zero =	pos_zero + EEPROM.read(pos_zero_memory_addres);	// pos zero memory addres
 
 	pos_final = EEPROM.read(pos_final_addres);
-	if (pos_final <	0				 ){ pos_final = 0;} //ギヤポジション0より小を禁止
-	if (pos_final >	speed_step){ pos_final = 0;} //ギヤポジション9より大を禁止
+	if (pos_final <	0)
+		pos_final = 0; //ギヤポジション0より小を禁止
+	if (pos_final >	speed_step)
+		pos_final = 0; //ギヤポジション9より大を禁止
 	pos_new = pos_final;
 	pos = pos_zero - pos_shiftstep * pos_new + pos_data[pos_new];
-	
+
 	for(int n=2;n<= speed_step+1 ;n++)
 	{
 		pos_data[n] = EEPROM.read(pos_memory_addres + n -1 );
@@ -237,20 +239,21 @@ void loop()
 		int value = debouncer.read();
 		if ( value == HIGH)
 		{
-			 digitalWrite(LED_PIN2, HIGH );
-			 buttonState = 0;
-			 Serial.println("Button released (state 0)");
-			 pos_ctrl_end();
+			digitalWrite(LED_PIN2, HIGH );
+			buttonState = 0;
+			Serial.println("Button released (state 0)");
+			pos_ctrl_end();
 		}
 		else
 		{
-			 digitalWrite(LED_PIN2, LOW );
-			 buttonState = 1;
-			 Serial.println("Button pressed (state 1)");
-			 buttonPressTimeStamp = millis();
-			 pos_old = pos_new;
-			 if( pos_new < speed_step ) {pos_new ++;}
-			 pos_ctrl();
+			digitalWrite(LED_PIN2, LOW );
+			buttonState = 1;
+			Serial.println("Button pressed (state 1)");
+			buttonPressTimeStamp = millis();
+			pos_old = pos_new;
+			if( pos_new < speed_step )
+				pos_new ++;
+			pos_ctrl();
 		}
 	}
  
@@ -260,20 +263,21 @@ void loop()
 		int value2 = debouncer2.read();
 		if ( value2 == HIGH)
 		{
-			 digitalWrite(LED_PIN2, HIGH );
-			 buttonState2 = 0;
-			 Serial.println("Button2 released (state 0)");
-			 pos_ctrl_end();
+			digitalWrite(LED_PIN2, HIGH );
+			buttonState2 = 0;
+			Serial.println("Button2 released (state 0)");
+			pos_ctrl_end();
 		}
 		else
 		{
-			 digitalWrite(LED_PIN2, LOW );
-			 buttonState2 = 1;
-			 Serial.println("Button2 pressed (state 1)");
-			 buttonPressTimeStamp2 = millis();
-			 pos_old = pos_new;
-			 if( pos_new >0 ) {pos_new --;}
-			 pos_ctrl();
+			digitalWrite(LED_PIN2, LOW );
+			buttonState2 = 1;
+			Serial.println("Button2 pressed (state 1)");
+			buttonPressTimeStamp2 = millis();
+			pos_old = pos_new;
+			if( pos_new >0 )
+				pos_new --;
+			pos_ctrl();
 		}
 	}
  
@@ -286,7 +290,8 @@ void loop()
 			buttonState = 2;
 			Serial.println("Button held for 0.50 seconds (state 2)");
 			pos_old = pos_new;
-			if( pos_new < speed_step ) {pos_new ++;}
+			if( pos_new < speed_step )
+				pos_new ++;
 			pos_ctrl();
 		}
 	}
@@ -298,7 +303,8 @@ void loop()
 			buttonState = 3;
 			Serial.println("Button held for 1.0 seconds (state 3)");
 			pos_old = pos_new;
-			if( pos_new < speed_step ) { pos_new ++;}
+			if( pos_new < speed_step )
+				pos_new ++;
 			pos_ctrl();
 		}
 	}
@@ -311,9 +317,7 @@ void loop()
 			Serial.println("Button held for 1.5 seconds (state 4)");
 			pos_old = pos_new;
 			if( pos_new < speed_step ) 
-			{
 				pos_new ++;
-			}
 			pos_ctrl();
 		}
 	} 
@@ -326,10 +330,8 @@ void loop()
 			Serial.println("Button2 held for 0.50 seconds (state 2)");
 			pos_old = pos_new;
 			if( pos_new	>0 )
-			{
 				pos_new --;
-			}
-			 pos_ctrl();
+			pos_ctrl();
 		}
 	}
 
@@ -341,9 +343,7 @@ void loop()
 			Serial.println("Button2 held for 1.0 seconds (state 3)");
 			pos_old = pos_new;
 			if( pos_new	>0 )
-			{
 				pos_new --;
-			}
 			pos_ctrl();
 		}
 	}
@@ -356,9 +356,7 @@ void loop()
 			Serial.println("Button2 held for 1.5 seconds (state 4)");
 			pos_old = pos_new;
 			if( pos_new	>0 )
-			{
 				pos_new --;
-			}
 			pos_ctrl();
 		}
 	}
