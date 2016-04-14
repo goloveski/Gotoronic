@@ -105,7 +105,7 @@ int pos_memory_addres = 11; //offsetmemory start addres 11 12 13 14 15 16 17 18 
 
 //////////////////////////////// REAR SHIFT SETTING PARAMETER START ///////////////////////////////////////////
 
-int speed_step = 8;						//8=9速 9=10速 10=11速
+int speed_step = 9;						//8=9速 9=10速 10=11速
 int pos_zero0 = 1925;					// shift 0 position 180deg ->1st gear direction, 0deg ->10th gear direction, 
 int pos_zero = 1925;					 // shift 0 position 180deg ->1st gear direction, 0deg ->10th gear direction, 
 int pos_shiftstep = 68;				// shift step degree 56->68 @160404 for 9speed
