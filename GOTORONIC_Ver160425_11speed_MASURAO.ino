@@ -1,3 +1,7 @@
+//Copyright (c) 2016 goloveski
+//Released under the MIT license
+//http://opensource.org/licenses/mit-license.php
+//
 // SERVO REAR
 // Red = +6v
 // Brown = GND
