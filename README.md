@@ -11,3 +11,9 @@ V160425:
          added front gear trim mode (trial)
          
          reduction data size for Atmega168
+
+ V160905:  V3.0 released
+         
+         added STAND ALONE SETTING MODE2 (Rear zero&step tuning  Front tuning)
+         
+         
