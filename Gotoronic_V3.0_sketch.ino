@@ -1,7 +1,6 @@
 //Copyright (c) 2016 goloveski
 //Released under the MIT license
 //http://opensource.org/licenses/mit-license.php
-//
 // SERVO REAR
 // Red = +6v
 // Brown = GND
@@ -51,7 +50,7 @@ int pos_shiftstep_org = 65;        // shift step 56->68 @160404
 int pos_shiftstep;
 int pos_data_ORG[11] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // 11speed offset data
 int fine_tune_pitch = 1;      //fine tune pitch data for setting mode
-int zero_tune_pitch = 1;      //zero tune pitch data for setting2 mode
+int zero_tune_pitch = 5;      //zero tune pitch data for setting2 mode
 
 int pos_shiftover_up = 30;   // shift over step
 int pos_shiftover_down = 10; // shift over step
@@ -137,7 +136,7 @@ void setup()
   {
     pos_data_E2PR[n] = EEPROM.read(pos_memory_addres + n );
     if ( pos_data_E2PR[n] >  128) {
-      pos_data_E2PR[n] =  pos_data_E2PR[n] - 255; //offset data EEPROMは0～255なので負数はオフセットさせる。
+      pos_data_E2PR[n] =  pos_data_E2PR[n] - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
     }
     pos_data[n] =  pos_data_ORG[n] + pos_data_E2PR[n];
     delay(2);
@@ -146,14 +145,14 @@ void setup()
 
   pos_data_step_E2PR = EEPROM.read(pos_memory_addres_step);
   if (pos_data_step_E2PR >  128) {
-    pos_data_step_E2PR =  pos_data_step_E2PR - 255; //offset data EEPROMは0～255なので負数はオフセットさせる。
+    pos_data_step_E2PR =  pos_data_step_E2PR - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
   }
   pos_shiftstep = pos_shiftstep_org + pos_data_step_E2PR;
   delay(2);
 
   pos_data_zero_E2PR = EEPROM.read(pos_memory_addres_zero);
   if (pos_data_zero_E2PR >  128) {
-    pos_data_zero_E2PR =  pos_data_zero_E2PR - 255; //offset data EEPROMは0～255なので負数はオフセットさせる。
+    pos_data_zero_E2PR =  pos_data_zero_E2PR - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
   }
   pos_zero =  pos_zero_org + pos_data_zero_E2PR;
   delay(2);
@@ -176,7 +175,7 @@ void setup()
   {
     pos_data_f_E2PR[k] = EEPROM.read(pos_f_memory_addres + k );
     if ( pos_data_f_E2PR[k] >  128) {
-      pos_data_f_E2PR[k] =  pos_data_f_E2PR[k] - 255; //offset data EEPROMは0～255なので負数はオフセットさせる。
+      pos_data_f_E2PR[k] =  pos_data_f_E2PR[k] - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
     }
     pos_data_f[k] =  pos_data_f_ORG[k] + pos_data_f_E2PR[k];
     delay(2);
@@ -186,7 +185,7 @@ void setup()
   {
     pos_front_E2PR[i] = EEPROM.read(pos_f_set_memory_addres + i);
     if (pos_front_E2PR[i] >  128) {
-      pos_front_E2PR[i] =  pos_front_E2PR[i] - 255; //offset data EEPROMは0～255なので負数はオフセットさせる。
+      pos_front_E2PR[i] =  pos_front_E2PR[i] - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
     }
     delay(2);
   }
@@ -274,7 +273,7 @@ void loop() {
       CAL_STAT = true;
       int value = debouncerY.read();
       if ( value == LOW) {
-        CAL_STAT = false;
+        //CAL_STAT = false;
         CAL_STAT2 = true;
       }
       pinMode(LED_PIN_MODSEL, INPUT_PULLUP);
@@ -303,21 +302,27 @@ void loop() {
       buttonState = 1;
       //Serial.println(F("Button pressed (state 1)"));
       if (CAL_STAT == true ) {
-        pos_data[pos_new] = pos_data[pos_new] + fine_tune_pitch;
-        //        Serial.print(F("pos_data = "));
-        //        Serial.println(pos_data[pos_new]);
-      }
-      if (CAL_STAT2 == true ) {
-        if (pos_new == 0 ) {
-          pos_zero = pos_zero + zero_tune_pitch;
+        if (CAL_STAT2 == true ) {
+          if (pos_new == 0 ) {
+            pos_data_zero_E2PR = pos_data_zero_E2PR - zero_tune_pitch;
+            pos_zero = pos_zero - zero_tune_pitch;
+            EEPROM.write(pos_memory_addres_zero, pos_data_zero_E2PR);
+            delay(5);
+          }
+          else {
+            pos_shiftstep = pos_shiftstep + 1 ;
+            pos_data_step_E2PR = pos_data_step_E2PR + 1;
+            EEPROM.write(pos_memory_addres_step, pos_data_step_E2PR);
+            delay(5);
+          }
+          Serial.print(F("pos_zero = "));
+          Serial.println(pos_zero);
+          Serial.print(F("pos_shiftstep = "));
+          Serial.println(pos_shiftstep);
         }
         else {
-          pos_shiftstep = pos_shiftstep + 1 ;
+          pos_data[pos_new] = pos_data[pos_new] + fine_tune_pitch;
         }
-        Serial.print(F("pos_zero = "));
-        Serial.println(pos_zero);
-        Serial.print(F("pos_shiftstep = "));
-        Serial.println(pos_shiftstep);
       }
       else {
         pos_old = pos_new;
@@ -346,21 +351,27 @@ void loop() {
       buttonState2 = 1;
       //Serial.println(F("Button2 pressed (state 1)"));
       if (CAL_STAT == true ) {
-        pos_data[pos_new] = pos_data[pos_new] - fine_tune_pitch;
-        // Serial.print(F("pos_data = "));
-        // Serial.println(pos_data[pos_new]);
-      }
-      if (CAL_STAT2 == true ) {
-        if (pos_new == 0 ) {
-          pos_zero = pos_zero - zero_tune_pitch;
+        if (CAL_STAT2 == true ) {
+          if (pos_new == 0 ) {
+            pos_data_zero_E2PR = pos_data_zero_E2PR + zero_tune_pitch;
+            pos_zero = pos_zero + zero_tune_pitch;
+            EEPROM.write(pos_memory_addres_zero, pos_data_zero_E2PR);
+            delay(5);
+          }
+          else {
+            pos_shiftstep = pos_shiftstep - 1 ;
+            pos_data_step_E2PR = pos_data_step_E2PR - 1;
+            EEPROM.write(pos_memory_addres_step, pos_data_step_E2PR);
+            delay(5);
+          }
+          Serial.print(F("pos_zero = "));
+          Serial.println(pos_zero);
+          Serial.print(F("pos_shiftstep = "));
+          Serial.println(pos_shiftstep);
         }
         else {
-          pos_shiftstep = pos_shiftstep - 1 ;
+          pos_data[pos_new] = pos_data[pos_new] - fine_tune_pitch;
         }
-        Serial.print(F("pos_zero = "));
-        Serial.println(pos_zero);
-        Serial.print(F("pos_shiftstep = "));
-        Serial.println(pos_shiftstep);
       }
       else {
         pos_old = pos_new;
@@ -618,6 +629,138 @@ void pos_ctrl_end() {
   //Serial.println(pos_data_E2PR[pos_new]);
   int offset_data_EEPROM = EEPROM.read(pos_memory_addres + pos_final);
   Serial.print(F("EEPROM new fine tune offset = "));
+  Serial.println(offset_data_EEPROM);
+  Serial.println();
+
+  Serial.println(F("//////// FRONT DATA/////////////////////////////////////"));
+  Serial.print(F("servo front position = "));
+  Serial.println(pos_f);
+  pos_final_f = EEPROM.read(pos_final_addres_f);
+  Serial.print(F("EEPROM NEW FRONT POS = "));
+  Serial.println(pos_final_f);
+  //Serial.print(F("servo FRONT fine tune offset EEPROM = "));
+  //Serial.println(pos_data_f_E2PR[pos_new]);
+  int offset_data_f_EEPROM = EEPROM.read(pos_f_memory_addres + pos_final);
+  Serial.print(F("EEPROM nww fine tune offset = "));
+  Serial.println(offset_data_f_EEPROM);
+  Serial.println();
+}
+
+void paramter_output() {
+  //  Serial.println(F(""));
+  Serial.println(F("////////  MCU PIN ASSIGN /////////////////////////////////////"));
+  Serial.print(F("FRONT SERVO PIN = "));
+  Serial.println(SERVO_PIN_F);
+  Serial.print(F("REAR SERVO PIN = "));
+  Serial.println(SERVO_PIN_R);
+  Serial.print(F("REAR LOW DOUN BUTTON_PIN = "));
+  Serial.println(BUTTON_PIN);
+  Serial.print(F("REAR High UP BUTTON_PIN2 = "));
+  Serial.println(BUTTON_PIN2);
+  Serial.print(F("FRONT LOW DOUN BUTTON_PIN_f1 = "));
+  Serial.println(BUTTON_PIN_f1);
+  Serial.print(F("FRONT High UP BUTTON_PIN_f2 = "));
+  Serial.println(BUTTON_PIN_f2);
+  Serial.print(F("SETTING MODE SELECT = "));
+  Serial.println(BUTTON_PIN_MODESEL);
+  Serial.print(F("SETTING MODE2 SELECT = "));
+  Serial.println(BUTTON_PIN_MODESEL2);
+
+  Serial.print(F("SHIFT INDICATOR LED = "));
+  Serial.println(LED_PIN2);
+  Serial.print(F("SETTING MODE INDICATOR LED = "));
+  Serial.println(LED_PIN_MODSEL);
+
+  Serial.println(F(""));
+  Serial.println(F("//////// REAR PARAMETERS /////////////////////////////////////"));
+  Serial.print(F("speed_step = "));
+  Serial.print(speed_step);
+  Serial.println(F("             //8=9SPEED 9=10SPEED 10=11SPEED"));
+  Serial.print(F("pos_zero_org = "));
+  Serial.println(pos_zero_org);
+  Serial.print(F("pos_zero = "));
+  Serial.print(pos_zero);
+  Serial.println(F("             // shift 0 position : about 2000~1800"));
+  Serial.print(F("pos_shiftstep_org = "));
+  Serial.println(pos_shiftstep_org);
+  Serial.print(F("pos_shiftstep = "));
+  Serial.print(pos_shiftstep);
+  Serial.println(F("             //shift step"));
+  Serial.print(F("pos_shiftover_up = "));
+  Serial.print(pos_shiftover_up);
+  Serial.println(F("             // shift over step"));
+  Serial.print(F("pos_shiftover_down = "));
+  Serial.print(pos_shiftover_down);
+  Serial.println(F("             // shift over step"));
+  Serial.print(F("wait_msec1 = "));
+  Serial.print(wait_msec1);
+  Serial.println(F("[msec]"));
+  Serial.print(F("wait_msec2 = "));
+  Serial.print(wait_msec2);
+  Serial.println(F("[msec]"));
+  Serial.print(F("wait_msec3 = "));
+  Serial.print(wait_msec3);
+  Serial.println(F("[msec]"));
+  Serial.print(F("fine_tune_pitch = "));
+  Serial.print(fine_tune_pitch);
+  Serial.println(F("             //fine tune pitch for setting mode"));
+
+  Serial.print(F("pos_data_ORG[11] = "));
+  for (int x = 0; x <= 10; x++) {
+    Serial.print(pos_data_ORG[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F(""));
+
+  Serial.print(F("pos_data_E2PR[11] = "));
+  for (int x = 0; x <= 10; x++) {
+    Serial.print(pos_data_E2PR[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F(""));
+
+  Serial.println(F(""));
+  Serial.println(F("//////// FRONT PARAMETERS /////////////////////////////////////"));
+  Serial.print(F("pos_front[2] = "));
+  for (int x = 0; x <= 1; x++) {
+    Serial.print(pos_front[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F("             // {inner, outer}"));
+  Serial.print(F("pos_front_E2PR[2] = "));
+  for (int x = 0; x <= 1; x++) {
+    Serial.print(pos_front_E2PR[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F("             //E2PR {inner, outer}"));
+  Serial.print(F("pos_shiftover_up_f = "));
+  Serial.print( pos_shiftover_up_f);
+  Serial.println(F("             // shift over step "));
+  Serial.print(F("pos_shiftover_down_f = "));
+  Serial.print(pos_shiftover_down_f);
+  Serial.println(F("             // shift over step "));
+
+  Serial.print(F("pos_data_f_ORG[11] = "));
+  for (int x = 0; x <= 10; x++) {
+    Serial.print(pos_data_f_ORG[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F(""));
+
+  Serial.print(F("pos_data_f_E2PR[11] = "));
+  for (int x = 0; x <= 10; x++) {
+    Serial.print(pos_data_f_E2PR[x]);
+    Serial.print(F(","));
+  }
+  Serial.println(F(""));
+  Serial.println(F(""));
+  Serial.println(F("//////// You can set this position. ////////////"));
+  Serial.print(F("SETTING POSITION REAR = "));
+  Serial.println(pos_final);
+  Serial.print(F("SETTING POSITION FRONT = "));
+  Serial.println(pos_final_f);
+  Serial.println(F(""));
+}
   Serial.println(offset_data_EEPROM);
   Serial.println();
 
