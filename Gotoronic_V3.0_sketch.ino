@@ -52,14 +52,16 @@ int pos_data_ORG[11] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // 11speed offset dat
 int fine_tune_pitch = 1;      //fine tune pitch data for setting mode
 int zero_tune_pitch = 5;      //zero tune pitch data for setting2 mode
 
-int pos_shiftover_up = 30;   // shift over step
+int pos_shiftover_up = 15;   // shift over step
 int pos_shiftover_down = 10; // shift over step
-int ovsft_delay = 10;       // over shift delay [msec]
+int pos_shiftover_up_tune = 20; // shift over step (ややUP気味に戻してやる）
+int ovsft_delay = 2000;       // over shift delay [msec]
+int ovsft_delay2 = 500;       // over shift delay [msec]
 int sft_delay = 20;          // shift delay per gear pos [msec]
 
-int wait_msec1 =  700;     //多段変則設定時間1[msec]
-int wait_msec2 =  900;     //多段変則設定時間2[msec]
-int wait_msec3 = 1100;     //多段変則設定時間3[msec]
+int wait_msec1 = 1000;     //多段変則設定時間1[msec]
+int wait_msec2 = 1200;     //多段変則設定時間2[msec]
+int wait_msec3 = 1400;     //多段変則設定時間3[msec]
 
 ////////do not change//////////
 int pos_data[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //  "do not change" 11speed offset data MATRIX
@@ -108,6 +110,7 @@ unsigned long buttonPressTimeStamp;
 unsigned long buttonPressTimeStamp2;
 unsigned long buttonPressTimeStamp3;
 unsigned long buttonPressTimeStamp4;
+unsigned long pos_ctrl_end_TimeStamp;
 
 volatile boolean CAL_STAT = false; // fine tune mode
 volatile boolean CAL_STAT2 = false; // fine tune mode2
@@ -295,7 +298,12 @@ void loop() {
       digitalWrite(LED_PIN2, LOW );
       buttonState = 0;
       //Serial.println(F("Button released (state 0)"));
-      pos_ctrl_end();
+      pos_ctrl_end_TimeStamp = millis();
+      Serial.print(F("TimeStamp = "));
+      Serial.println(millis());
+      Serial.print(F("pos_ctrl_end_TimeStamp = "));
+      Serial.println( pos_ctrl_end_TimeStamp);
+      //        pos_ctrl_end();
     }
     else  {
       digitalWrite(LED_PIN2, HIGH );
@@ -344,7 +352,12 @@ void loop() {
       digitalWrite(LED_PIN2, LOW );
       buttonState2 = 0;
       //Serial.println(F("Button2 released (state 0)"));
-      pos_ctrl_end();
+      pos_ctrl_end_TimeStamp = millis();
+      Serial.print(F("TimeStamp = "));
+      Serial.println(millis());
+      Serial.print(F("pos_ctrl_end_TimeStamp = "));
+      Serial.println( pos_ctrl_end_TimeStamp);
+      //        pos_ctrl_end();
     }
     else {
       digitalWrite(LED_PIN2, HIGH );
@@ -386,6 +399,24 @@ void loop() {
     }
   }
 
+  //////* メカ位置最終調整用*//////
+  if  ( buttonState == 0 ) {
+    if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
+      buttonState = 100;
+      Serial.print(F("TimeStamp = "));
+      Serial.println(millis());
+      pos_ctrl_end();
+    }
+  }
+  if  ( buttonState2 == 0 ) {
+    if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
+      buttonState2 = 100;
+      Serial.print(F("TimeStamp = "));
+      Serial.println(millis());
+      pos_ctrl_end();
+    }
+  }
+
   /* 多段変速用*/
 
   if ( CAL_STAT == false ) {                          //　CAL時は多段変速を禁止
@@ -414,7 +445,7 @@ void loop() {
       }
       if  ( buttonState == 3 ) {
         if ( millis() - buttonPressTimeStamp >= wait_msec3 ) {
-          buttonState = 0;
+          buttonState = 100;
           //Serial.println(F("Button held for 1.5 seconds (state 4)"));
           pos_old = pos_new;
           if ( pos_new < speed_step ) {
@@ -448,7 +479,7 @@ void loop() {
       }
       if  ( buttonState2 == 3 ) {
         if ( millis() - buttonPressTimeStamp2 >= wait_msec3 ) {
-          buttonState2 = 0;
+          buttonState2 = 100;
           //Serial.println(F("Button2 held for 1.5 seconds (state 4)"));
           pos_old = pos_new;
           if ( pos_new  > 0 ) {
@@ -468,7 +499,10 @@ void loop() {
       digitalWrite(LED_PIN2, LOW );
       buttonState3 = 0;
       //Serial.println(F("Button_f1 released (state 0)"));
-      pos_ctrl_end();
+      //pos_ctrl_end_TimeStamp = millis();
+      //      if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
+              pos_ctrl_end();
+      //      }
     }
     else  {
       digitalWrite(LED_PIN2, HIGH );
@@ -502,7 +536,10 @@ void loop() {
       digitalWrite(LED_PIN2, LOW );
       buttonState4 = 0;
       //Serial.println(F("Button_f2 released (state 0)"));
-      pos_ctrl_end();
+      pos_ctrl_end_TimeStamp = millis();
+      //      if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
+              pos_ctrl_end();
+      //      }
     }
     else {
       digitalWrite(LED_PIN2, HIGH );
@@ -568,7 +605,6 @@ void serialin() {
 void pos_ctrl()
 {
   pos_direction = pos_new - pos_old;
-  //ovsft_delay_tot = abs(pos_direction) * sft_delay + ovsft_delay;
   if ( pos_direction > 0 ) {                                        // up stroke
     pos = pos_zero - pos_shiftstep * pos_new - pos_data[pos_new] - pos_shiftover_up;   // shift over degree
     Serial.print(F("servo position = "));
@@ -600,7 +636,9 @@ void pos_ctrl()
 }
 
 void pos_ctrl_end() {
-  delay(ovsft_delay);                                                         // ovsft_delay[msec]
+  pos = pos_zero - pos_shiftstep * pos_new - pos_data[pos_new] - pos_shiftover_up_tune;               // set position
+  myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos'
+  delay(ovsft_delay2);                                                         // ovsft_delay[msec]
   pos = pos_zero - pos_shiftstep * pos_new - pos_data[pos_new];               // set position
   myservo.writeMicroseconds(pos);                                             // tell servo to go to position in variable 'pos'
   pos_f = pos_front[pos_final_f] + pos_front_E2PR[pos_final_f] + pos_data_f[pos_new];    // set position フロントの段数＋リヤの段数によるトリム
