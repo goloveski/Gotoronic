@@ -339,8 +339,8 @@ void loop() {
           Serial.print(F("pos_new = "));
           Serial.println(pos_new);
         }
-        pos_ctrl();
       }
+      pos_ctrl();
       buttonPressTimeStamp = millis();
     }
   }
@@ -393,8 +393,8 @@ void loop() {
           Serial.print(F("pos_new = "));
           Serial.println(pos_new);
         }
-        pos_ctrl();
       }
+      pos_ctrl();
       buttonPressTimeStamp2 = millis();
     }
   }
@@ -501,7 +501,7 @@ void loop() {
       //Serial.println(F("Button_f1 released (state 0)"));
       //pos_ctrl_end_TimeStamp = millis();
       //      if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
-              pos_ctrl_end();
+      pos_ctrl_end();
       //      }
     }
     else  {
@@ -538,7 +538,7 @@ void loop() {
       //Serial.println(F("Button_f2 released (state 0)"));
       pos_ctrl_end_TimeStamp = millis();
       //      if ( millis() - pos_ctrl_end_TimeStamp >= ovsft_delay ) {               // ovsft_delay[msec]
-              pos_ctrl_end();
+      pos_ctrl_end();
       //      }
     }
     else {
