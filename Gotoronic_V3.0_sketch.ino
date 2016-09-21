@@ -157,7 +157,7 @@ void setup()
   if (pos_data_zero_E2PR >  128) {
     pos_data_zero_E2PR =  pos_data_zero_E2PR - 256; //offset data EEPROMは0～255なので負数はオフセットさせる。
   }
-  pos_zero =  pos_zero_org + pos_data_zero_E2PR;
+  pos_zero =  pos_zero_org + zero_tune_pitch * pos_data_zero_E2PR;
   delay(2);
 
   pos = pos_zero - pos_shiftstep * pos_new - pos_data[pos_new];
@@ -312,7 +312,7 @@ void loop() {
       if (CAL_STAT == true ) {
         if (CAL_STAT2 == true ) {
           if (pos_new == 0 ) {
-            pos_data_zero_E2PR = pos_data_zero_E2PR - zero_tune_pitch;
+            pos_data_zero_E2PR = pos_data_zero_E2PR - 1; //   zero_tune_pitch;
             pos_zero = pos_zero - zero_tune_pitch;
             EEPROM.write(pos_memory_addres_zero, pos_data_zero_E2PR);
             delay(5);
@@ -366,7 +366,7 @@ void loop() {
       if (CAL_STAT == true ) {
         if (CAL_STAT2 == true ) {
           if (pos_new == 0 ) {
-            pos_data_zero_E2PR = pos_data_zero_E2PR + zero_tune_pitch;
+            pos_data_zero_E2PR = pos_data_zero_E2PR + 1; //  zero_tune_pitch;
             pos_zero = pos_zero + zero_tune_pitch;
             EEPROM.write(pos_memory_addres_zero, pos_data_zero_E2PR);
             delay(5);
